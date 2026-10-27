@@ -19,6 +19,16 @@ export class Events {
     }, useCapture); 
 }
     }
+    on(element, eventType, handler) {
+        if (!element._handlers) element._handlers = {};
+        element._handlers[eventType] = handler;
+    }
+    off(element, eventType) {
+        if (element._handlers) {
+            delete element._handlers[eventType];
+        }
+    }
+
 
  
 }
