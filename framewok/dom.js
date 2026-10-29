@@ -1,7 +1,3 @@
-import { Events } from "./event.js";
-
-const eventManager = new Events();
-
 // A tiny virtual DOM with recursive, keyed diffing.
 const previousTrees = new WeakMap();
 
@@ -29,6 +25,7 @@ function createDom(vnode) {
     for (const child of vnode.children) element.append(createDom(child));
     return element;
 }
+
 function setAttr(element, name, oldValue, value) {
     if (name === 'key') return;
 
@@ -84,6 +81,47 @@ function keyOf(vnode) {
     return isText(vnode) ? null : vnode?.attrs?.key ?? null;
 }
 
+function sameKind(left, right) {
+    if (isText(left) || isText(right)) return isText(left) && isText(right);
+    return left?.tag === right?.tag;
+}
+
+function patchChildren(element, oldChildren, newChildren) {
+    const oldEntries = oldChildren.map((vnode, index) => ({
+        vnode,
+        node: element.childNodes[index],
+        used: false
+    }));
+
+    for (let index = 0; index < newChildren.length; index += 1) {
+        const newChild = newChildren[index];
+        const key = keyOf(newChild);
+        let entry = null;
+
+        if (key !== null) {
+            entry = oldEntries.find((item) => !item.used && keyOf(item.vnode) === key);
+        } else {
+            entry = oldEntries.find((item) => (
+                !item.used && keyOf(item.vnode) === null && sameKind(item.vnode, newChild)
+            ));
+        }
+
+        const currentNode = element.childNodes[index] || null;
+        if (!entry) {
+            element.insertBefore(createDom(newChild), currentNode);
+            continue;
+        }
+
+        entry.used = true;
+        if (entry.node !== currentNode) element.insertBefore(entry.node, currentNode);
+        patch(element, entry.node, entry.vnode, newChild);
+    }
+
+    for (const entry of oldEntries) {
+        if (!entry.used && entry.node.parentNode === element) entry.node.remove();
+    }
+}
+
 function patch(parent, node, oldVNode, newVNode) {
     if (!sameKind(oldVNode, newVNode)) {
         parent.replaceChild(createDom(newVNode), node);
@@ -98,4 +136,15 @@ function patch(parent, node, oldVNode, newVNode) {
 
     updateAttrs(node, oldVNode.attrs, newVNode.attrs);
     patchChildren(node, oldVNode.children, newVNode.children);
+}
+
+export function render(vnode, container) {
+    const hasPreviousTree = previousTrees.has(container);
+    const previousTree = previousTrees.get(container);
+    if (!hasPreviousTree || !container.firstChild) {
+        container.replaceChildren(createDom(vnode));
+    } else {
+        patch(container, container.firstChild, previousTree, vnode);
+    }
+    previousTrees.set(container, vnode);
 }
