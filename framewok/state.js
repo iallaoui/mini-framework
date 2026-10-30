@@ -1,12 +1,17 @@
-// staaate managment recivity system 
+export function createStore(initialState) {
+    let state = { ...initialState };
+    const subscribers = new Set();
 
-
-export function createStore(initialState, notifyCallback) {
-    return new Proxy(initialState, {
-        set(target, key, value) {
-            target[key] = value;
-            if (typeof notifyCallback === 'function') notifyCallback();
-            return true;
+    return {
+        getState: () => state,
+        setState(update) {
+            const changes = typeof update === 'function' ? update(state) : update;
+            state = { ...state, ...changes };
+            subscribers.forEach((subscriber) => subscriber(state));
+        },
+        subscribe(subscriber) {
+            subscribers.add(subscriber);
+            return () => subscribers.delete(subscriber);
         }
-    });
+    };
 }
