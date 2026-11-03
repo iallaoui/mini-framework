@@ -1,18 +1,20 @@
+
 import { h, render } from '../framewok/dom.js';
 import { Events } from '../framewok/event.js';
 import { createStore } from '../framewok/state.js';
 import Router from '../framewok/router.js';
 
 const root = document.querySelector('#root');
-let savedTodos = [];
-try {
-    const saved = JSON.parse(localStorage.getItem('todos') || '[]');
-    if (Array.isArray(saved)) savedTodos = saved;
-} catch {
-    localStorage.removeItem('todos');
-}
-const store = createStore({ todos: savedTodos, filter: 'all', editingId: null });
-let nextId = savedTodos.reduce((largest, todo) => Math.max(largest, todo.id), 0) + 1;
+
+// Changed: Start with an empty list instead of localStorage
+const store = createStore({
+    todos: [],
+    filter: 'all',
+    editingId: null
+});
+
+// Changed: IDs start at 1 on each page load
+let nextId = 1;
 
 function updateTodos(transform) {
     store.setState(({ todos }) => ({ todos: transform(todos) }));
@@ -31,10 +33,13 @@ function commitEdit(id, value) {
 function TodoItem(todo, editingId) {
     const editing = editingId === todo.id;
     const classes = [todo.completed && 'completed', editing && 'editing'].filter(Boolean).join(' ');
-    return h('li', { key: todo.id, className: classes, 'data-id': todo.id },
+
+    return h('li', { key: todo.id, className: classes},
         h('div', { className: 'view' },
             h('input', {
-                className: 'toggle', type: 'checkbox', checked: todo.completed,
+                className: 'toggle',
+                type: 'checkbox',
+                checked: todo.completed,
                 onChange: () => updateTodos((todos) => todos.map((item) => (
                     item.id === todo.id ? { ...item, completed: !item.completed } : item
                 )))
@@ -50,14 +55,18 @@ function TodoItem(todo, editingId) {
                 }
             }, todo.title),
             h('button', {
-                className: 'destroy', 'aria-label': `Delete ${todo.title}`,
+                className: 'destroy',
+                'aria-label': `Delete ${todo.title}`,
                 onClick: () => updateTodos((todos) => todos.filter((item) => item.id !== todo.id))
             })
         ),
         h('input', {
-            className: 'edit', value: todo.title,
+            className: 'edit',
+            value: todo.title,
             onBlur: (event) => {
-                if (store.getState().editingId === todo.id) commitEdit(todo.id, event.target.value);
+                if (store.getState().editingId === todo.id) {
+                    commitEdit(todo.id, event.target.value);
+                }
             },
             onKeydown: (event) => {
                 if (event.key === 'Enter') {
@@ -76,6 +85,7 @@ function TodoItem(todo, editingId) {
 
 function App(state) {
     const activeCount = state.todos.filter((todo) => !todo.completed).length;
+
     const visible = state.todos.filter((todo) => (
         state.filter === 'active' ? !todo.completed :
         state.filter === 'completed' ? todo.completed : true
@@ -92,7 +102,9 @@ function App(state) {
                     if (!title) return;
                     input.value = '';
                     updateTodos((todos) => [...todos, {
-                        id: nextId++, title, completed: false
+                        id: nextId++,
+                        title,
+                        completed: false
                     }]);
                 }
             },
@@ -106,7 +118,9 @@ function App(state) {
         state.todos.length > 0 && h('main', { className: 'main' },
             h('div', { className: 'toggle-all-container' },
                 h('input', {
-                    id: 'toggle-all', className: 'toggle-all', type: 'checkbox',
+                    id: 'toggle-all',
+                    className: 'toggle-all',
+                    type: 'checkbox',
                     checked: activeCount === 0,
                     onChange: (event) => updateTodos((todos) => todos.map((todo) => ({
                         ...todo,
@@ -115,20 +129,26 @@ function App(state) {
                 }),
                 h('label', { htmlFor: 'toggle-all' }, 'Mark all as complete')
             ),
-            h('ul', { className: 'todo-list' }, visible.map((todo) => TodoItem(todo, state.editingId)))
+            h('ul', { className: 'todo-list' },
+                visible.map((todo) => TodoItem(todo, state.editingId))
+            )
         ),
         state.todos.length > 0 && h('footer', { className: 'footer' },
             h('span', { className: 'todo-count' },
-                h('strong', {}, activeCount), ` ${activeCount === 1 ? 'item' : 'items'} left`
+                h('strong', {}, activeCount),
+                ` ${activeCount === 1 ? 'item' : 'items'} left`
             ),
             h('ul', { className: 'filters' },
-                [['All', '/', 'all'], ['Active', '/active', 'active'], ['Completed', '/completed', 'completed']]
-                    .map(([label, route, filter]) => h('li', { key: filter },
-                        h('a', {
-                            href: `#${route}`,
-                            className: state.filter === filter ? 'selected' : ''
-                        }, label)
-                    ))
+                [
+                    ['All', '/', 'all'],
+                    ['Active', '/active', 'active'],
+                    ['Completed', '/completed', 'completed']
+                ].map(([label, route, filter]) => h('li', { key: filter },
+                    h('a', {
+                        href: `#${route}`,
+                        className: state.filter === filter ? 'selected' : ''
+                    }, label)
+                ))
             ),
             state.todos.some((todo) => todo.completed) && h('button', {
                 className: 'clear-completed',
@@ -138,8 +158,8 @@ function App(state) {
     );
 }
 
+// Changed: Render without saving to localStorage
 store.subscribe((state) => {
-    localStorage.setItem('todos', JSON.stringify(state.todos));
     render(App(state), root);
 });
 

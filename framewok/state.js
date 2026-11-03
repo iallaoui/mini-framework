@@ -11,7 +11,7 @@ export function createStore(initialState) {
         },
         subscribe(subscriber) {
             subscribers.add(subscriber);
-            return () => subscribers.delete(subscriber);
+            return ;
         }
     };
 }
