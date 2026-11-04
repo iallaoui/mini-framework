@@ -90,6 +90,8 @@ function App(state) {
         state.filter === 'active' ? !todo.completed :
         state.filter === 'completed' ? todo.completed : true
     ));
+    const visibleIds = new Set(visible.map((todo) => todo.id));
+    const allVisibleCompleted = visible.length > 0 && visible.every((todo) => todo.completed);
 
     return h('section', { className: 'todoapp' },
         h('header', { className: 'header' },
@@ -121,11 +123,13 @@ function App(state) {
                     id: 'toggle-all',
                     className: 'toggle-all',
                     type: 'checkbox',
-                    checked: activeCount === 0,
-                    onChange: (event) => updateTodos((todos) => todos.map((todo) => ({
-                        ...todo,
-                        completed: event.target.checked
-                    })))
+                    checked: allVisibleCompleted,
+                    disabled: visible.length === 0,
+                    onChange: (event) => updateTodos((todos) => todos.map((todo) => (
+                        visibleIds.has(todo.id)
+                            ? { ...todo, completed: event.target.checked }
+                            : todo
+                    )))
                 }),
                 h('label', { htmlFor: 'toggle-all' }, 'Mark all as complete')
             ),
