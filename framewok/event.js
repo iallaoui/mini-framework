@@ -14,7 +14,7 @@ export class Events {
             const listener = (event) => {
                 let element = event.target;
                 while (element && this.root.contains(element)) {
-                    const handler = element._handlers?.[type];
+                    const handler = element.eventHandlers?.[type];
                     if (handler) {
                         handler(event);
                         return;

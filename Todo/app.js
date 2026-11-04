@@ -1,4 +1,3 @@
-
 import { h, render } from '../framewok/dom.js';
 import { Events } from '../framewok/event.js';
 import { createStore } from '../framewok/state.js';
@@ -6,16 +5,16 @@ import Router from '../framewok/router.js';
 
 const root = document.querySelector('#root');
 
-// Changed: Start with an empty list instead of localStorage
+// Keep the complete todo list and the current UI state in one store.
 const store = createStore({
     todos: [],
     filter: 'all',
     editingId: null
 });
 
-// Changed: IDs start at 1 on each page load
 let nextId = 1;
 
+// Apply a transformation to the todo list while preserving the rest of the state.
 function updateTodos(transform) {
     store.setState(({ todos }) => ({ todos: transform(todos) }));
 }
@@ -30,6 +29,7 @@ function commitEdit(id, value) {
     }));
 }
 
+// Render one todo item, including its view and inline editing controls.
 function TodoItem(todo, editingId) {
     const editing = editingId === todo.id;
     const classes = [todo.completed && 'completed', editing && 'editing'].filter(Boolean).join(' ');
@@ -46,6 +46,7 @@ function TodoItem(todo, editingId) {
             }),
             h('label', {
                 onDblclick: () => {
+                    // Focus the edit field after the state update has rendered it.
                     store.setState({ editingId: todo.id });
                     requestAnimationFrame(() => {
                         const input = document.querySelector('.editing .edit');
@@ -84,6 +85,7 @@ function TodoItem(todo, editingId) {
 }
 
 function App(state) {
+    // Derive the count and list displayed by the active route filter.
     const activeCount = state.todos.filter((todo) => !todo.completed).length;
 
     const visible = state.todos.filter((todo) => (
@@ -162,13 +164,15 @@ function App(state) {
     );
 }
 
-// Changed: Render without saving to localStorage
+// Re-render the application whenever the store changes.
 store.subscribe((state) => {
     render(App(state), root);
 });
 
+// Register the DOM events used by the todo controls.
 new Events(root).init(['click', 'change', 'submit', 'dblclick', 'keydown', 'blur']);
 
+// Keep the selected filter in sync with the URL hash route.
 new Router({
     '/': () => store.setState({ filter: 'all' }),
     '/active': () => store.setState({ filter: 'active' }),

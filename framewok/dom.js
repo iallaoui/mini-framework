@@ -2,22 +2,22 @@
 const previousTrees = new WeakMap();
 
 export function h(tag, attrs = {}, ...children) {
+    // Normalize nested children and discard empty conditional children.
     return {
         tag,
         attrs: attrs || {},
-        children: children.flat(Infinity).filter((child) => (
-            child !== null && child !== undefined && child !== false
-        ))
-    };
+        children: children.flat().filter((child) => ( child !== false ))
+    }
 }
 
 function isText(vnode) {
     return typeof vnode === 'string' || typeof vnode === 'number';
 }
 
+// Convert a virtual node tree into real DOM nodes on the initial render.
 function createDom(vnode) {
     if (isText(vnode)) {
-        return document.createTextNode(String(vnode));
+        return document.createTextNode(vnode);
     }
 
     const element = document.createElement(vnode.tag);
@@ -26,24 +26,17 @@ function createDom(vnode) {
     return element;
 }
 
-function setAttr(element, name, oldValue, value) {
+// Handle special virtual-DOM attributes before falling back to DOM properties.
+function setAttr(element, name, value) {
     if (name === 'key') return;
 
     if (name.startsWith('on')) {
         const type = name.slice(2).toLowerCase();
-        element._handlers ||= {};
-        if (typeof value === 'function') element._handlers[type] = value;
-        else delete element._handlers[type];
-        return;
-    }
-
-    if (name === 'style') {
-        const oldStyle = oldValue && typeof oldValue === 'object' ? oldValue : {};
-        const newStyle = value && typeof value === 'object' ? value : {};
-        for (const property of Object.keys(oldStyle)) {
-            if (!(property in newStyle)) element.style[property] = '';
+        if (!element.eventHandlers) {
+            element.eventHandlers = {};
         }
-        Object.assign(element.style, newStyle);
+
+        element.eventHandlers[type] = value;
         return;
     }
 
@@ -52,16 +45,13 @@ function setAttr(element, name, oldValue, value) {
         return;
     }
 
-    if (value === false || value === null || value === undefined) {
+    if (value === false) {
         element.removeAttribute(name);
-        if (name in element) {
-            if (typeof element[name] === 'boolean') element[name] = false;
-            else if (typeof element[name] === 'string') element[name] = '';
-        }
+        element[name] = false;
         return;
     }
 
-    if (name in element && name !== 'list' && name !== 'form') {
+    if (name in element) {
         element[name] = value;
     } else {
         element.setAttribute(name, value === true ? '' : String(value));
@@ -69,24 +59,27 @@ function setAttr(element, name, oldValue, value) {
 }
 
 function updateAttrs(element, oldAttrs, newAttrs) {
-    const names = new Set([...Object.keys(oldAttrs), ...Object.keys(newAttrs)]);
-    for (const name of names) {
+    // Update only attributes whose values changed between renders.
+    for (const name of Object.keys(newAttrs)) {
         if (oldAttrs[name] !== newAttrs[name]) {
-            setAttr(element, name, oldAttrs[name], newAttrs[name]);
+            setAttr(element, name, newAttrs[name]);
         }
     }
 }
 
 function keyOf(vnode) {
-    return isText(vnode) ? null : vnode?.attrs?.key ?? null;
+    if (isText(vnode)) return null;
+    return vnode.attrs.key ?? null;
 }
 
 function sameKind(left, right) {
-    if (isText(left) || isText(right)) return isText(left) && isText(right);
-    return left?.tag === right?.tag;
+    if (isText(left) && isText(right)) return true;
+    if (isText(left) || isText(right)) return false;
+    return left.tag === right.tag;
 }
 
 function patchChildren(element, oldChildren, newChildren) {
+    // Match keyed children by key and unkeyed children by their position/type.
     const oldEntries = oldChildren.map((vnode, index) => ({
         vnode,
         node: element.childNodes[index],
@@ -123,6 +116,7 @@ function patchChildren(element, oldChildren, newChildren) {
 }
 
 function patch(parent, node, oldVNode, newVNode) {
+    // Replace incompatible nodes; otherwise update their contents in place.
     if (!sameKind(oldVNode, newVNode)) {
         parent.replaceChild(createDom(newVNode), node);
         return;
@@ -139,9 +133,9 @@ function patch(parent, node, oldVNode, newVNode) {
 }
 
 export function render(vnode, container) {
-    const hasPreviousTree = previousTrees.has(container);
+    // Reuse the previous tree so subsequent renders can be diffed efficiently.
     const previousTree = previousTrees.get(container);
-    if (!hasPreviousTree || !container.firstChild) {
+    if (!previousTree || !container.firstChild) {
         container.replaceChildren(createDom(vnode));
     } else {
         patch(container, container.firstChild, previousTree, vnode);
